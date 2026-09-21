@@ -1,0 +1,9 @@
+.react-paint-editor-rangefield {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  flex-wrap: wrap;
+}
+.react-paint-editor-rangefield [data-indeterminate='1'] {
+  opacity: 0.25;
+}

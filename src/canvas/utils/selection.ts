@@ -1,0 +1,300 @@
+import type { UtilsSettings } from '@canvas/constants/app'
+import { CANVAS_DEFAULT_RECT_SETTINGS } from '@canvas/constants/tools'
+import { createRectangle } from '@canvas/utils/shapes/rectangle'
+import { roundValues } from '@canvas/utils/transform'
+import { rotatePoint } from '@canvas/utils/trigo'
+import type { HoverModeData, SelectionModeData } from '@common/types/Mode'
+import type { Point, Rect, SelectionType, ShapeEntity } from '@common/types/Shapes'
+import { getSelectedShapes } from '@common/utils/selection'
+import { checkPositionIntersection, checkSelectionIntersection } from './intersect'
+
+export const getNewSelectionData = (
+  hoverMode: HoverModeData,
+  selectedShape: SelectionType,
+  cursorPosition: Point
+): SelectionModeData<Point | number> | undefined => {
+  if (hoverMode.mode === 'translate') {
+    return {
+      mode: 'translate',
+      cursorStartPosition: cursorPosition,
+      originalShape: selectedShape,
+      hasBeenDuplicated: false,
+      dateStart: Date.now(),
+      selectedShapesLengthAtMouseDown: getSelectedShapes(selectedShape).length
+    }
+  }
+  if (hoverMode.mode === 'rotate') {
+    const { center: centerBeforeResize } = selectedShape.computed
+    const center: Point = [centerBeforeResize[0], centerBeforeResize[1]]
+    return {
+      mode: 'rotate',
+      cursorStartPosition: cursorPosition,
+      originalShape: selectedShape,
+      center,
+      selectedShapesLengthAtMouseDown: getSelectedShapes(selectedShape).length
+    }
+  }
+  if (hoverMode.mode === 'resize') {
+    return {
+      mode: 'resize',
+      cursorStartPosition: cursorPosition,
+      originalShape: selectedShape,
+      anchor: hoverMode.anchor,
+      selectedShapesLengthAtMouseDown: getSelectedShapes(selectedShape).length
+    }
+  }
+  return undefined
+}
+
+export const selectShape = (
+  ctx: CanvasRenderingContext2D,
+  shapes: ShapeEntity[],
+  cursorPosition: Point,
+  settings: UtilsSettings,
+  selectedShape: SelectionType | undefined,
+  isTouchGesture: boolean,
+  withFrameSelection: boolean,
+  behavior: 'add' | 'remove' | 'replace' = 'replace'
+): {
+  mode: SelectionModeData<Point | number>
+  shape: SelectionType | undefined
+} => {
+  let selectedShapePositionIntersection: false | HoverModeData = false
+  if (selectedShape) {
+    selectedShapePositionIntersection = checkSelectionIntersection(
+      ctx,
+      selectedShape,
+      cursorPosition,
+      settings,
+      true,
+      isTouchGesture ? 20 : undefined
+    )
+
+    const newSelectionMode = getNewSelectionData(selectedShapePositionIntersection || { mode: 'default' }, selectedShape, cursorPosition)
+    if (newSelectionMode?.mode === 'resize' || newSelectionMode?.mode === 'rotate') {
+      return { shape: selectedShape, mode: newSelectionMode }
+    }
+  }
+  const foundShape =
+    shapes.find(shape => {
+      return getSelectedShapes(selectedShape).find(selectedShape => shape.id === selectedShape?.id)
+        ? selectedShapePositionIntersection && checkSelectionIntersection(ctx, shape, cursorPosition, settings, true, isTouchGesture ? 20 : undefined)
+        : !!checkPositionIntersection(ctx, shape, cursorPosition, settings)
+    }) ?? (selectedShapePositionIntersection ? selectedShape : undefined)
+
+  if (selectedShape && selectedShape?.id === foundShape?.id) {
+    return {
+      shape: selectedShape,
+      mode: {
+        mode: 'translate',
+        cursorStartPosition: cursorPosition,
+        hasBeenDuplicated: false,
+        dateStart: Date.now(),
+        originalShape: selectedShape,
+        selectedShapesLengthAtMouseDown: getSelectedShapes(selectedShape).length
+      }
+    }
+  }
+
+  if (foundShape?.locked && behavior === 'add') {
+    return {
+      shape: selectedShape,
+      mode: {
+        mode: withFrameSelection ? 'selectionFrame' : 'default'
+      }
+    }
+  }
+
+  if (foundShape && behavior === 'add' && selectedShape?.locked) {
+    const foundShapeGroup = buildShapesGroup([foundShape], settings)
+    return {
+      shape: foundShapeGroup,
+      mode: {
+        mode: 'translate',
+        cursorStartPosition: cursorPosition,
+        hasBeenDuplicated: false,
+        dateStart: Date.now(),
+        originalShape: foundShapeGroup!,
+        selectedShapesLengthAtMouseDown: getSelectedShapes(selectedShape).length
+      }
+    }
+  }
+
+  if (foundShape) {
+    if (behavior === 'add') {
+      const foundShapeGroup = buildShapesGroup(addToSelectedShapes(selectedShape, [foundShape]), settings)
+      return {
+        shape: foundShapeGroup,
+        mode: {
+          mode: 'translate',
+          cursorStartPosition: cursorPosition,
+          hasBeenDuplicated: false,
+          dateStart: Date.now(),
+          originalShape: foundShapeGroup!,
+          selectedShapesLengthAtMouseDown: getSelectedShapes(selectedShape).length
+        }
+      }
+    }
+    if (behavior === 'remove') {
+      const foundShapeGroup = buildShapesGroup(omitFromSelectedShapes(selectedShape, foundShape), settings)
+      return {
+        shape: foundShapeGroup,
+        mode: {
+          mode: 'translate',
+          cursorStartPosition: cursorPosition,
+          hasBeenDuplicated: false,
+          dateStart: Date.now(),
+          originalShape: foundShapeGroup!,
+          selectedShapesLengthAtMouseDown: getSelectedShapes(selectedShape).length
+        }
+      }
+    }
+    const foundShapeGroup = getSelectedShapes(selectedShape).find(shape => shape.id === foundShape?.id)
+      ? selectedShape
+      : buildShapesGroup([foundShape], settings)
+    return {
+      shape: foundShapeGroup,
+      mode: {
+        mode: 'translate',
+        cursorStartPosition: cursorPosition,
+        hasBeenDuplicated: false,
+        dateStart: Date.now(),
+        originalShape: foundShapeGroup!,
+        selectedShapesLengthAtMouseDown: getSelectedShapes(selectedShape).length
+      }
+    }
+  }
+
+  return {
+    shape: behavior !== 'replace' ? selectedShape : undefined,
+    mode: {
+      mode: withFrameSelection ? 'selectionFrame' : 'default'
+    }
+  }
+}
+
+const buildGroupBorders = (shapes: ShapeEntity[], rotation: number, settings: UtilsSettings): Rect => {
+  const movedBorders = shapes.map(
+    shape =>
+      (
+        [
+          [shape.computed.borders.x + settings.selectionPadding, shape.computed.borders.y + settings.selectionPadding],
+          [shape.computed.borders.x - settings.selectionPadding + shape.computed.borders.width, shape.computed.borders.y + settings.selectionPadding],
+          [
+            shape.computed.borders.x - settings.selectionPadding + shape.computed.borders.width,
+            shape.computed.borders.y - settings.selectionPadding + shape.computed.borders.height
+          ],
+          [shape.computed.borders.x + settings.selectionPadding, shape.computed.borders.y - settings.selectionPadding + shape.computed.borders.height]
+        ] as [Point, Point, Point, Point]
+      ).map(point => {
+        const rotatedByItsCenter = rotatePoint({
+          point: [point[0], point[1]],
+          origin: shape.computed.center,
+          rotation: -(shape.rotation ?? 0)
+        })
+        const movedOnCanvasCenter = rotatePoint({
+          point: [rotatedByItsCenter[0], rotatedByItsCenter[1]],
+          origin: [0, 0],
+          rotation
+        })
+        return movedOnCanvasCenter
+      }) as [Point, Point, Point, Point]
+  )
+  const movedbordersXMin = Math.min(...movedBorders.flatMap(shape => [shape[0][0], shape[1][0], shape[2][0], shape[3][0]]))
+  const movedBordersYMin = Math.min(...movedBorders.flatMap(shape => [shape[0][1], shape[1][1], shape[2][1], shape[3][1]]))
+  const movedBordersXMax = Math.max(...movedBorders.flatMap(shape => [shape[0][0], shape[1][0], shape[2][0], shape[3][0]]))
+  const movedBordersYMax = Math.max(...movedBorders.flatMap(shape => [shape[0][1], shape[1][1], shape[2][1], shape[3][1]]))
+
+  const movedCenter = [(movedbordersXMin + movedBordersXMax) / 2, (movedBordersYMin + movedBordersYMax) / 2] as Point
+
+  const realCenter = rotatePoint({
+    point: movedCenter,
+    origin: [0, 0],
+    rotation: -rotation
+  })
+
+  const origVector = [movedCenter[0] - realCenter[0], movedCenter[1] - realCenter[1]] as Point
+
+  const minX = roundValues(movedbordersXMin - origVector[0])
+  const maxX = roundValues(movedBordersXMax - origVector[0])
+  const minY = roundValues(movedBordersYMin - origVector[1])
+  const maxY = roundValues(movedBordersYMax - origVector[1])
+
+  return {
+    width: maxX - minX,
+    height: maxY - minY,
+    x: minX,
+    y: minY
+  }
+}
+
+export const buildShapesGroup = (shapes: ShapeEntity[], settings: UtilsSettings): SelectionType | undefined => {
+  if (!shapes.length) return undefined
+  if (shapes.length === 1) return shapes[0]
+
+  const sameRotation = !shapes.some(shape => shape.rotation !== shapes[0]!.rotation)
+  const rotation = sameRotation ? (shapes[0]?.rotation ?? 0) : 0
+
+  const borders = buildGroupBorders(shapes, rotation, settings)
+
+  const groupRectangle = createRectangle(
+    {
+      id: 'group_selection',
+      type: 'rect',
+      settings: CANVAS_DEFAULT_RECT_SETTINGS
+    },
+    [borders.x, borders.y],
+    settings,
+    borders.width,
+    borders.height
+  )
+
+  const style = shapes.slice(1)!.reduce((acc, shape) => {
+    const shapeStyle = shape.style ?? {}
+    const newAcc: Record<string, unknown> = {}
+
+    for (const key in shapeStyle) {
+      if (acc[key as keyof typeof acc] === undefined) continue
+      if (shapeStyle[key as keyof typeof acc] === undefined) continue
+
+      if (acc[key as keyof typeof acc] === shapeStyle[key as keyof typeof shapeStyle]) {
+        newAcc[key] = acc[key as keyof typeof acc]!
+      }
+    }
+    return newAcc
+  }, shapes[0]!.style ?? {})
+
+  return {
+    id: shapes.map(shape => shape.id).join('-'),
+    type: 'group',
+    shapes,
+    rotation,
+    visible: true,
+    locked: false,
+    selection: groupRectangle.selection,
+    x: groupRectangle.x,
+    y: groupRectangle.y,
+    width: groupRectangle.width,
+    height: groupRectangle.height,
+    style,
+    computed: groupRectangle.computed,
+    path: groupRectangle.path
+  }
+}
+
+export const applyToSelectedShape =
+  (applyToShape: (shape: ShapeEntity, settings: UtilsSettings) => ShapeEntity, settings: UtilsSettings) =>
+  (selection: SelectionType | undefined): SelectionType | undefined => {
+    if (!selection) return undefined
+    const shapes = selection.type === 'group' ? selection.shapes.map(shape => applyToShape(shape, settings)) : [applyToShape(selection, settings)]
+    return buildShapesGroup(shapes, settings)
+  }
+
+export const addToSelectedShapes = (selection: SelectionType | undefined, shapes: ShapeEntity[]): ShapeEntity[] => {
+  const currentShapes = getSelectedShapes(selection)
+  return [...new Set([...currentShapes, ...shapes])]
+}
+
+export const omitFromSelectedShapes = (selection: SelectionType | undefined, shape: ShapeEntity): ShapeEntity[] => {
+  return getSelectedShapes(selection).filter(selectedShape => selectedShape.id !== shape.id)
+}

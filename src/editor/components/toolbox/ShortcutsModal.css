@@ -1,0 +1,35 @@
+.react-paint-editor-toolbox-shortcuts-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 420px;
+}
+
+.react-paint-shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 12px;
+}
+
+.react-paint-shortcut-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: 4px 0;
+  border-bottom: 1px dashed rgba(0, 0, 0, 0.08);
+}
+
+.react-paint-shortcut-item kbd {
+  background-color: #f1f3f5;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #343a40;
+}

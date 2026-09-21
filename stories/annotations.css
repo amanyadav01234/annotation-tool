@@ -1,0 +1,35 @@
+.grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.annotations-container {
+  position: relative;
+  padding: 36px 0;
+}
+
+.pic-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.picture {
+  display: block;
+  width: 100%;
+}
+
+.annotations {
+  position: absolute;
+  left: 0;
+  right: 0;
+}
+
+.annotations.editor {
+  top: 0;
+  bottom: 0;
+}
+
+.view {
+  top: 36px;
+  bottom: 36px;
+}

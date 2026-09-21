@@ -1,0 +1,100 @@
+{
+  "name": "@aman-yadav/react-paint",
+  "version": "1.0.0",
+  "type": "module",
+  "sideEffects": false,
+  "keywords": [
+    "react",
+    "canvas",
+    "whiteboard",
+    "image annotation",
+    "drawing",
+    "annotation",
+    "paint",
+    "aman-yadav"
+  ],
+  "description": "An advanced canvas-based library for React developed by Aman Yadav for image annotation and digital whiteboarding.",
+  "homepage": "https://aman-yadav.github.io/react-paint",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/aman-yadav/react-paint.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aman-yadav/react-paint/issues"
+  },
+  "author": "Aman Yadav",
+  "license": "SEE LICENSE IN LICENSE.txt",
+  "packageManager": "pnpm@10.20.0",
+  "main": "./dist/react-paint.umd.cjs",
+  "module": "./dist/react-paint.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/react-paint.js",
+      "require": "./dist/react-paint.umd.cjs"
+    },
+    "./canvas": {
+      "types": "./dist/canvas/index.d.ts",
+      "import": "./dist/canvas/index.js"
+    },
+    "./editor": {
+      "types": "./dist/editor/index.d.ts",
+      "import": "./dist/editor/index.js"
+    },
+    "./react-paint.css": "./dist/react-paint.css"
+  },
+  "typesVersions": {
+    "*": {
+      "canvas": [
+        "./dist/canvas/index.d.ts"
+      ],
+      "editor": [
+        "./dist/editor/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "README.md",
+    "LICENSE.txt",
+    "package.json",
+    "dist/"
+  ],
+  "devDependencies": {
+    "@biomejs/biome": "2.4.9",
+    "@storybook/addon-a11y": "10.3.3",
+    "@storybook/addon-docs": "10.3.3",
+    "@storybook/addon-links": "10.3.3",
+    "@storybook/addon-vitest": "10.3.3",
+    "@storybook/react-vite": "10.3.3",
+    "@types/node": "25.5.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.1",
+    "@vitest/browser-playwright": "4.1.2",
+    "@vitest/coverage-v8": "4.1.2",
+    "jsdom": "29.0.1",
+    "playwright": "1.58.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "storybook": "10.3.3",
+    "typescript": "6.0.2",
+    "vite": "8.0.16",
+    "vitest": "4.1.2"
+  },
+  "peerDependencies": {
+    "react": "18.x",
+    "react-dom": "18.x"
+  },
+  "scripts": {
+    "build": "rm -rf dist && vite build --config vite.config.umd.ts && vite build",
+    "build-storybook": "storybook build",
+    "declarationfiles": "pnpm tsc --project tsconfig.prod.json && node fixDtsPath.js",
+    "lint": "pnpm biome check --write src stories tests",
+    "prepublishOnly": "pnpm build && pnpm declarationfiles",
+    "publishnpm": "pnpm publish --access public",
+    "start": "storybook dev -p 6006",
+    "test": "vitest --project=unit",
+    "test-storybook": "vitest --project=storybook"
+  }
+}
