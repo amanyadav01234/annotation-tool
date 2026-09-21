@@ -125,6 +125,4 @@ npm run start
 
 Developed and maintained by **Aman Yadav**.
 
-## License
 
-Copyright (c) 2026 Aman Yadav. See [LICENSE.txt](LICENSE.txt) for details.
